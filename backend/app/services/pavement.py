@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.ingest.pipeline import write_back_repair
 from app.store import store
 
 MODULE = "pavement"
@@ -55,7 +56,12 @@ class PavementService:
         target = ACTION_RULES[action]
         if target not in STATUS_ORDER:
             return None, f"目标状态「{target}」不在允许的状态序列里"
-        entry["status"] = target
-        entry["pending"] = target != STATUS_ORDER[-1]
-        entry["abnormal"] = action in NEGATIVE_ACTIONS
-        return entry, f"病害记录已{action}"
+        # 病害台账状态流转 + 巡查清单/限载待办回写共用一个事务：
+        # 回写失败则台账状态也一并回滚，三处结论不会停在不一致的中间态。
+        with store.transaction():
+            entry["status"] = target
+            entry["病害状态"] = target
+            entry["pending"] = target != STATUS_ORDER[-1]
+            entry["abnormal"] = action in NEGATIVE_ACTIONS
+            write_back_repair(entry, target)
+        return entry, f"病害记录已{action}，修复结论已回写巡查清单与限载待办"

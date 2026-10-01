@@ -11,6 +11,17 @@
       </div>
     </header>
 
+    <div v-if="limitTodos.length" class="limit-panel">
+      <h3>桥梁限载提示（由路面病害材料同事务回写）</h3>
+      <ul class="limit-list">
+        <li v-for="todo in limitTodos" :key="String(todo.病害编号)">
+          <span class="limit-stake">{{ todo.限载桩号 ?? '—' }}</span>
+          <span class="limit-text">{{ todo.限载待办 }}</span>
+          <span class="badge bad">{{ todo.限载状态 }}</span>
+        </li>
+      </ul>
+    </div>
+
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
         <span class="stat-label">{{ item.label }}</span>
@@ -81,6 +92,28 @@ const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 
+type LimitTodo = {
+  病害编号: string
+  桥梁名称: string | null
+  限载待办: string | null
+  限载状态: string | null
+  限载桩号: string | null
+}
+const limitTodos = ref<LimitTodo[]>([])
+
+async function loadLimitTodos() {
+  try {
+    const response = await request('/api/risk/summary')
+    if (!response.ok) return
+    const payload = (await response.json()) as { items: LimitTodo[] }
+    limitTodos.value = (payload.items ?? []).filter(
+      (item) => item.桥梁名称 && item.限载状态 === '待处置',
+    )
+  } catch {
+    // 限载提示读不到不阻塞桥梁档案列表
+  }
+}
+
 function resetFilters() {
   filters.value = {}
   void reload()
@@ -126,5 +159,55 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  void reload()
+  void loadLimitTodos()})
 </script>
+
+<style scoped>
+.limit-panel {
+  border: 1px solid #f3c7c0;
+  background: #fff7f6;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.limit-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #c0392b;
+}
+.limit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.limit-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.limit-stake {
+  font-weight: 600;
+  min-width: 84px;
+  color: #b42318;
+}
+.limit-text {
+  flex: 1;
+  color: #475467;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.badge.bad {
+  background: #fdecea;
+  color: #c0392b;
+}
+</style>

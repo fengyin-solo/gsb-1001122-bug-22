@@ -17,7 +17,8 @@
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/          每个业务模块一组接口
 │   ├── app/services/         业务规则与状态流转
-│   └── app/store.py          内存数据仓库与示例数据
+│   ├── app/ingest/           外部材料接入与投影处理线
+│   └── app/store.py          内存数据仓库、事务边界与示例数据
 ├── .gitignore
 └── docker-compose.yml
 ```
@@ -74,3 +75,36 @@ npm run dev
   `backend/app/routers/<模块>.py`，业务规则在 `backend/app/services/<模块>.py`。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 外部材料接入与投影处理线
+
+路面病害外部材料（采集车/检测单位回传）统一从「养护材料 → 接入外部材料」
+（`POST /api/material/ingest`）入库，处理顺序固定：
+
+```
+解析 → 桩号裁决（现行里程基线）→ 空间投影（唯一映射）
+     → 病害台账 / 巡查清单 / 桥梁限载待办 同事务回写 → 材料指纹登记
+```
+
+- **同一事务边界**：裁决、投影、三模块落库、指纹登记在 `store.transaction()` 内提交，
+  任一写入失败整批回滚，不留半批病害，指纹也不会误登记（`app/store.py`）。
+- **桩号裁决**：同方向桩号冲突一律以现行里程基线为准（`app/ingest/baseline.py`），
+  材料原始桩号只作留痕；无基线路段拒绝落库。
+- **空间投影**：三模块只能消费 `app/ingest/projection.py` 对同一裁决结论产出的坐标，
+  病害列表、病害详情、桥梁限载提示因此显示同一个桩号。
+- **材料指纹幂等**：按业务身份字段做规范化 SHA-256（`app/ingest/fingerprint.py`），
+  同一份材料并发接入或断线重连只生效一次；桩号 `K12+800` 与 `12+800.0` 视为同位置。
+- **断线复位**：批次先建档（`ingest_batch` 表），成功才置 completed；
+  重连带原 `batch_id` 只处理未完成行，已完成批次直接幂等回放。
+- **存量迁移**：`POST /api/material/migrate` 按采集顺序（发现日期、id）回填位置不符记录，
+  历史病害（`坐标来源=collected`）维持采集坐标不动，关联巡查/限载跟随病害台账同一投影。
+- **修复结论回写**：病害「标记修复/验收通过」在同一事务内回写巡查清单状态与限载待办
+  （待处置→已解除）。
+- **风险汇总页**：前端「风险汇总」（`GET /api/risk/summary`）把病害台账、巡查清单、
+  限载待办按同一裁决桩号对照，桩号不一致会直接标红。
+
+后端测试（标准库，无额外依赖）：
+
+```bash
+cd backend && python3 -m unittest discover -s tests
+```
