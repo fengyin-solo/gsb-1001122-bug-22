@@ -5,14 +5,25 @@
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.alignment import migrate_legacy_positions
 from app.config import settings
 from app.routers import ROUTERS
 from app.store import store
 
-app = FastAPI(title="市政道路桥梁养护管理平台", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """启动时把存量位置不符记录迁移回填到现行里程基线（幂等，历史采集坐标保留）。"""
+    migrate_legacy_positions(store)
+    yield
+
+
+app = FastAPI(title="市政道路桥梁养护管理平台", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

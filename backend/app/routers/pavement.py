@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/pavement", tags=["路面病害"])
 
 service = PavementService()
 
-LIST_FIELDS = ["病害编号", "所属路段", "病害类型", "严重程度", "起止桩号", "面积", "发现日期", "病害状态"]
+LIST_FIELDS = ["病害编号", "所属路段", "病害类型", "严重程度", "起止桩号", "现行桩号", "投影坐标", "面积", "发现日期", "病害状态"]
 STATUSES = ["待修复", "修复中", "已修复", "已验收"]
 
 

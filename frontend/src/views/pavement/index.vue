@@ -70,7 +70,7 @@ import { request } from '@/api/client'
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/pavement'
-const columns = ["病害编号", "所属路段", "病害类型", "严重程度", "起止桩号", "面积", "发现日期", "病害状态"]
+const columns = ["病害编号", "所属路段", "病害类型", "严重程度", "采集桩号", "现行桩号", "投影坐标", "面积", "发现日期", "病害状态"]
 const actions = ["派发修复", "标记修复", "验收通过"]
 const statuses = ["待修复", "修复中", "已修复", "已验收"]
 const stats = [{"label": "待修复病害", "value": 0}, {"label": "修复中病害", "value": 0}, {"label": "已修复病害", "value": 0}]

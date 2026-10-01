@@ -28,6 +28,20 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class IngestRowsPayload(BaseModel):
+    """外部路面病害材料接入：整批材料（rows）与可选的批次号/材料指纹。
+
+    断线复位后用同一批次号重提即为续传；材料指纹用于跨批次判重，留空则由服务端
+    对整批内容计算 SHA-256。
+    """
+
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    batch_id: str | None = None
+    source: str = "外部材料"
+    material_fingerprint: str | None = None
+
+
+
 
 class RoadSectionEntry(BaseModel):
     """管养路段明细结构。"""
